@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, useCallback } from 'react';
+import React, { createContext, useContext, useState, useCallback, useRef } from 'react';
 import { GameState, PlayerAnswer, DailyGame } from '@/lib/types';
 import { calculateScore, yearToPosition } from '@/lib/utils';
 
@@ -35,42 +35,55 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   const [game, setGameData] = useState<DailyGame | null>(null);
   const [state, setState] = useState<GameState>(initialState);
 
+  // Keep a ref to game so callbacks always see the current value
+  const gameRef = useRef<DailyGame | null>(null);
+
   const setGame = useCallback((g: DailyGame) => {
+    gameRef.current = g;
     setGameData(g);
     setState(initialState);
   }, []);
 
   const submitAnswer = useCallback(
     (position: number, estimatedYear: number) => {
-      if (!game) return;
-      const q = game.questions[state.currentQuestionIndex];
-      const correctPosition = yearToPosition(
-        q.answerYear,
-        q.leftEndpoint.year,
-        q.rightEndpoint.year
-      );
-      const score = calculateScore(position, correctPosition);
+      const currentGame = gameRef.current;
+      if (!currentGame) return;
 
-      const answer: PlayerAnswer = {
-        questionId: q.id,
-        position,
-        estimatedYear,
-        score,
-      };
+      setState((prev) => {
+        const q = currentGame.questions[prev.currentQuestionIndex];
+        const correctPosition = yearToPosition(
+          q.answerYear,
+          q.leftEndpoint.year,
+          q.rightEndpoint.year
+        );
+        const score = calculateScore(position, correctPosition);
 
-      setState((prev) => ({
-        ...prev,
-        phase: 'reveal',
-        answers: [...prev.answers, answer],
-      }));
+        const answer: PlayerAnswer = {
+          questionId: q.id,
+          position,
+          estimatedYear,
+          score,
+        };
+
+        return {
+          ...prev,
+          phase: 'reveal',
+          answers: [...prev.answers, answer],
+        };
+      });
     },
-    [game, state.currentQuestionIndex]
+    []
   );
 
   const nextQuestion = useCallback(() => {
+    const currentGame = gameRef.current;
+    if (!currentGame) return;
+    const totalQuestions = currentGame.questions.length;
+
     setState((prev) => {
       const next = prev.currentQuestionIndex + 1;
-      if (!game || next >= game.questions.length) {
+      if (next >= totalQuestions) {
+        // Should not happen — goToResults handles this — but guard anyway
         return prev;
       }
       return {
@@ -79,12 +92,14 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         phase: 'question',
       };
     });
-  }, [game]);
+  }, []);
 
   const goToResults = useCallback(() => {
     setState((prev) => {
       const total = prev.answers.reduce((sum, a) => sum + a.score, 0);
-      const finalScore = Math.round(total / prev.answers.length);
+      const finalScore = prev.answers.length > 0
+        ? Math.round(total / prev.answers.length)
+        : 0;
       return { ...prev, phase: 'results', finalScore };
     });
   }, []);

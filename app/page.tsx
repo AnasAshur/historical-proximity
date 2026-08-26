@@ -51,7 +51,7 @@ export default function HomePage() {
             <Button
               size="lg"
               className="text-lg tracking-wide"
-              style={{ letterSpacing: '0.08em', paddingLeft: '4rem', paddingRight: '4rem', paddingTop: '1.1rem', paddingBottom: '1.1rem' }}
+              style={{ letterSpacing: '0.08em', paddingLeft: '2rem', paddingRight: '2rem', paddingTop: '0.5rem', paddingBottom: '0.5rem' }}
             >
               Play
             </Button>

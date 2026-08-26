@@ -6,13 +6,14 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 /**
- * Linear scoring: how close was the player's position to the correct position?
- * Both positions are 0–100 percentages along the timeline.
- * Score = max(0, 100 - |playerPos - correctPos|)  ... but we scale it so that
- * being off by the full width (100%) gives 0, and perfect gives 100.
+ * Linear scoring.
+ * correctPosition is snapped to the nearest integer (the closest draggable position
+ * to the true answer) so that a player CAN achieve 100 by landing on that position.
+ * Score = max(0, 100 - |playerPos - round(correctPos)|)
  */
 export function calculateScore(playerPosition: number, correctPosition: number): number {
-  const distance = Math.abs(playerPosition - correctPosition);
+  const snappedCorrect = Math.round(correctPosition);
+  const distance = Math.abs(playerPosition - snappedCorrect);
   return Math.max(0, Math.round(100 - distance));
 }
 
@@ -28,7 +29,8 @@ export function yearToDisplay(year: number): string {
 
 /**
  * Given a year and two endpoint years, return the proportional 0–100 position.
- * leftYear is the OLDER (smaller) date, rightYear is the NEWER (larger) date.
+ * The slider always flows older (left) → newer (right).
+ * leftYear MUST be the smaller (older) year, rightYear the larger (newer) year.
  */
 export function yearToPosition(year: number, leftYear: number, rightYear: number): number {
   const total = rightYear - leftYear;
