@@ -1,13 +1,12 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { TimelineSlider } from './TimelineSlider';
 import { Button } from '@/components/ui/Button';
 import { useGame } from '@/context/GameContext';
 import { positionToYear } from '@/lib/utils';
 
-// Ring sound — a short bell tone generated with Web Audio API
 function playRing() {
   try {
     const ctx = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
@@ -23,31 +22,34 @@ function playRing() {
     osc.start(ctx.currentTime);
     osc.stop(ctx.currentTime + 0.8);
   } catch {
-    // Audio not available — fail silently
+    // silent fail
   }
 }
 
 export function QuestionScreen() {
   const { game, state, submitAnswer } = useGame();
   const [position, setPosition] = useState(50);
-  const [submitted, setSubmitted] = useState(false);
+  const submittedRef = useRef(false); // use ref to prevent double-submit
 
   if (!game) return null;
 
-  const q = game.questions[state.currentQuestionIndex];
-  const estimatedYear = positionToYear(position, q.leftEndpoint.year, q.rightEndpoint.year);
-  const questionNumber = state.currentQuestionIndex + 1;
+  // Snapshot the index at mount so it can't drift during this component's lifetime
+  const questionIndex = state.currentQuestionIndex;
+  const q = game.questions[questionIndex];
+  const questionNumber = questionIndex + 1;
 
   const handleSubmit = () => {
-    if (submitted) return;
-    setSubmitted(true);
+    if (submittedRef.current) return;
+    submittedRef.current = true;
+
+    const estimatedYear = positionToYear(position, q.leftEndpoint.year, q.rightEndpoint.year);
     playRing();
     submitAnswer(position, estimatedYear);
   };
 
   return (
     <motion.div
-      key={`question-${q.id}`}
+      key={`question-${questionIndex}`}
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -20 }}
@@ -61,16 +63,14 @@ export function QuestionScreen() {
             key={i}
             className="w-1.5 h-1.5 rounded-full transition-all duration-300"
             style={{
-              background: i <= questionNumber - 1 ? 'var(--foreground)' : 'var(--border)',
-              opacity: i <= questionNumber - 1 ? 1 : 0.4,
+              background: i <= questionIndex ? 'var(--foreground)' : 'var(--border)',
+              opacity: i <= questionIndex ? 1 : 0.4,
             }}
           />
         ))}
       </div>
 
-      {/* ── Mobile: stacked | Desktop: question top-left, slider full width below ── */}
-
-      {/* Question number + text — left-aligned on desktop */}
+      {/* Question number + text */}
       <div className="mb-10 md:text-left text-center">
         <p
           className="text-xs uppercase tracking-widest mb-3"
@@ -93,7 +93,7 @@ export function QuestionScreen() {
           rightEndpoint={q.rightEndpoint}
           value={position}
           onChange={setPosition}
-          disabled={submitted}
+          disabled={submittedRef.current}
         />
       </div>
 
@@ -102,7 +102,6 @@ export function QuestionScreen() {
         <Button
           size="lg"
           onClick={handleSubmit}
-          disabled={submitted}
           className="min-w-[180px]"
         >
           Submit

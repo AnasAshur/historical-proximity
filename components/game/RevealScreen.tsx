@@ -1,5 +1,6 @@
 'use client';
 
+import { useRef } from 'react';
 import { motion } from 'framer-motion';
 import { TimelineSlider } from './TimelineSlider';
 import { ScoreCounter } from './ScoreCounter';
@@ -10,12 +11,17 @@ import { yearToPosition, yearToDisplay } from '@/lib/utils';
 export function RevealScreen() {
   const { game, state, nextQuestion, goToResults } = useGame();
 
+  // Snapshot the question index the moment this component mounts.
+  // This prevents the reveal from reading the updated index after
+  // "Next Question" is pressed and the index increments during exit animation.
+  const snapshotIndex = useRef(state.currentQuestionIndex).current;
+
   if (!game) return null;
 
-  const q = game.questions[state.currentQuestionIndex];
-  const latestAnswer = state.answers[state.answers.length - 1];
+  const q = game.questions[snapshotIndex];
+  const latestAnswer = state.answers[snapshotIndex];
 
-  if (!latestAnswer) return null;
+  if (!q || !latestAnswer) return null;
 
   const correctPosition = yearToPosition(
     q.answerYear,
@@ -23,7 +29,7 @@ export function RevealScreen() {
     q.rightEndpoint.year
   );
 
-  const isLastQuestion = state.currentQuestionIndex === game.questions.length - 1;
+  const isLastQuestion = snapshotIndex === game.questions.length - 1;
 
   const handleNext = () => {
     if (isLastQuestion) {
@@ -35,7 +41,7 @@ export function RevealScreen() {
 
   return (
     <motion.div
-      key={`reveal-${q.id}`}
+      key={`reveal-${snapshotIndex}`}
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -20 }}
@@ -116,7 +122,7 @@ export function RevealScreen() {
         </p>
       </motion.div>
 
-      {/* Slider (locked, showing both markers) */}
+      {/* Slider (locked) */}
       <div className="mb-8">
         <TimelineSlider
           leftEndpoint={q.leftEndpoint}
@@ -129,7 +135,7 @@ export function RevealScreen() {
         />
       </div>
 
-      {/* Fun fact — no background, matches page color */}
+      {/* Fun fact */}
       <motion.div
         className="mb-8"
         initial={{ opacity: 0, y: 8 }}
@@ -147,7 +153,7 @@ export function RevealScreen() {
         </p>
       </motion.div>
 
-      {/* Next button */}
+      {/* Next / Results button */}
       <div className="flex justify-center">
         <Button size="lg" onClick={handleNext} className="min-w-[180px]">
           {isLastQuestion ? 'See Final Results' : 'Next Question →'}
