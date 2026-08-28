@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useCallback } from 'react';
+import { useRef, useCallback, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { positionToYear, yearToDisplay } from '@/lib/utils';
 import { Endpoint } from '@/lib/types';
@@ -8,11 +8,11 @@ import { Endpoint } from '@/lib/types';
 interface TimelineSliderProps {
   leftEndpoint: Endpoint;
   rightEndpoint: Endpoint;
-  value: number;           // 0–100
+  value: number;
   onChange: (pos: number) => void;
   disabled?: boolean;
-  correctPosition?: number; // 0–100 — shown on reveal
-  playerPosition?: number;  // 0–100 — shown on reveal
+  correctPosition?: number;
+  playerPosition?: number;
 }
 
 export function TimelineSlider({
@@ -40,10 +40,27 @@ export function TimelineSlider({
     [value]
   );
 
+  // Prevent page scroll / pull-to-refresh on mobile while dragging
+  useEffect(() => {
+    const track = trackRef.current;
+    if (!track) return;
+
+    const preventScroll = (e: TouchEvent) => {
+      if (isDragging.current) {
+        e.preventDefault();
+      }
+    };
+
+    // passive: false required to call preventDefault on touchmove
+    track.addEventListener('touchmove', preventScroll, { passive: false });
+    return () => track.removeEventListener('touchmove', preventScroll);
+  }, []);
+
   const handlePointerDown = useCallback(
     (e: React.PointerEvent) => {
       if (disabled) return;
       isDragging.current = true;
+      // Capture keeps all pointer events coming to this element even if cursor leaves
       (e.target as HTMLElement).setPointerCapture(e.pointerId);
       onChange(getPositionFromEvent(e.clientX));
     },
@@ -72,7 +89,8 @@ export function TimelineSlider({
   );
 
   return (
-    <div className="w-full select-none">
+    // touch-none stops the browser from intercepting touch as scroll
+    <div className="w-full select-none touch-none">
       {/* Endpoint labels */}
       <div className="flex justify-between mb-2 text-xs text-[var(--muted-foreground)] font-medium">
         <span className="max-w-[45%] text-left leading-tight">{leftEndpoint.label}</span>
@@ -94,6 +112,7 @@ export function TimelineSlider({
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onPointerLeave={handlePointerUp}
+        onPointerCancel={handlePointerUp}
         role="slider"
         aria-valuemin={0}
         aria-valuemax={100}
@@ -102,16 +121,13 @@ export function TimelineSlider({
         tabIndex={disabled ? -1 : 0}
         onKeyDown={handleKeyDown}
       >
-        {/* Filled track — CSS only, instant */}
+        {/* Filled track */}
         <div
           className="absolute top-0 left-0 h-full rounded-full"
-          style={{
-            background: 'var(--foreground)',
-            width: `${clampedValue}%`,
-          }}
+          style={{ background: 'var(--foreground)', width: `${clampedValue}%` }}
         />
 
-        {/* Player marker — pure CSS positioning, zero animation lag */}
+        {/* Player marker */}
         <div
           className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2"
           style={{ left: `${clampedValue}%` }}
@@ -124,14 +140,11 @@ export function TimelineSlider({
               cursor: disabled ? 'default' : 'grab',
             }}
           >
-            <div
-              className="w-2.5 h-2.5 rounded-full"
-              style={{ background: 'var(--foreground)' }}
-            />
+            <div className="w-2.5 h-2.5 rounded-full" style={{ background: 'var(--foreground)' }} />
           </div>
         </div>
 
-        {/* Correct position marker — animated entrance only on reveal */}
+        {/* Correct position marker */}
         {correctPosition !== undefined && (
           <motion.div
             className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 pointer-events-none"
@@ -150,7 +163,7 @@ export function TimelineSlider({
         )}
       </div>
 
-      {/* Current year readout — instant update, no animation */}
+      {/* Year readout */}
       <div className="mt-5 text-center">
         <span
           className="text-3xl font-bold tracking-tight"

@@ -1,7 +1,5 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-// Lazy singleton — only throws at runtime if env vars are missing,
-// not at build time when Next.js collects route metadata.
 let _supabase: SupabaseClient | null = null;
 
 function getSupabase(): SupabaseClient {
@@ -9,15 +7,11 @@ function getSupabase(): SupabaseClient {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!url || !key) {
-    throw new Error(
-      'Supabase env vars are not set. Copy .env.local.example → .env.local and fill in your project URL and anon key.'
-    );
+    throw new Error('Supabase env vars are not set.');
   }
   _supabase = createClient(url, key);
   return _supabase;
 }
-
-// ─── Types ────────────────────────────────────────────────────────────────────
 
 export interface DbGameResult {
   id?: string;
@@ -27,8 +21,6 @@ export interface DbGameResult {
   final_score: number;
   completed_at?: string;
 }
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 export async function saveGameResult(result: DbGameResult) {
   try {
@@ -69,7 +61,8 @@ export async function getPercentile(sessionId: string, date: string): Promise<nu
       .select('final_score')
       .eq('game_date', date);
 
-    if (!allScores || allScores.length === 0) return 100;
+    // Fewer than 10 players → default to Top 99%  (return 1 so display is "Top 99%")
+    if (!allScores || allScores.length < 10) return 1;
 
     const { data: myResult } = await sb
       .from('game_results')
@@ -78,12 +71,13 @@ export async function getPercentile(sessionId: string, date: string): Promise<nu
       .eq('game_date', date)
       .maybeSingle();
 
-    if (!myResult) return 50;
+    if (!myResult) return 1;
     const myScore = myResult.final_score;
     const worse = allScores.filter((r) => r.final_score < myScore).length;
+    // percentile = how many players are BELOW me  → "Top X%" = 100 - percentile
     return Math.round((worse / allScores.length) * 100);
   } catch {
-    return 50;
+    return 1;
   }
 }
 
@@ -96,7 +90,8 @@ export async function getStreak(sessionId: string): Promise<number> {
       .eq('user_session_id', sessionId)
       .order('game_date', { ascending: false });
 
-    if (!data || data.length === 0) return 0;
+    // First time playing → streak is 1 (just completed today)
+    if (!data || data.length === 0) return 1;
 
     const dates = data.map((r: { game_date: string }) => r.game_date).sort().reverse();
     const today = new Date();
@@ -113,8 +108,9 @@ export async function getStreak(sessionId: string): Promise<number> {
         break;
       }
     }
-    return streak;
+    // Always at least 1 (just finished today)
+    return Math.max(1, streak);
   } catch {
-    return 0;
+    return 1;
   }
 }

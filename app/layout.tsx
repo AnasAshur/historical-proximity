@@ -18,12 +18,17 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body>
+      {/*
+        overscroll-none on body prevents iOS/Android pull-to-refresh
+        which was triggering page reload when dragging the slider upward.
+      */}
+      <body className="overscroll-none">
         <ThemeProvider>
           <GameProvider>
             <div className="min-h-screen flex flex-col" style={{ background: 'var(--background)' }}>
               <Header />
-              <main className="flex-1 flex flex-col items-center">
+              {/* px-4 sm:px-6 gives comfortable side padding on all screen sizes */}
+              <main className="flex-1 flex flex-col items-center px-4 sm:px-6">
                 {children}
               </main>
             </div>

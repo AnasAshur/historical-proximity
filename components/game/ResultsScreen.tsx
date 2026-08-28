@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { ScoreCounter } from './ScoreCounter';
+import { CountdownTimer } from './CountdownTimer';
 import { Button } from '@/components/ui/Button';
 import { useGame } from '@/context/GameContext';
 import { yearToDisplay } from '@/lib/utils';
@@ -47,7 +48,8 @@ export function ResultsScreen() {
       setPercentile(pct);
       setStreak(str);
     }).catch(() => {
-      setPercentile(Math.floor(50 + Math.random() * 40));
+      // Supabase not configured — show defaults
+      setPercentile(1);   // Top 99%
       setStreak(1);
       setSaved(true);
     });
@@ -56,15 +58,21 @@ export function ResultsScreen() {
   if (!game) return null;
 
   const scoreLabel =
-    finalScore >= 90
-      ? 'Brilliant!'
-      : finalScore >= 75
-      ? 'Impressive!'
-      : finalScore >= 55
-      ? 'Well played!'
-      : finalScore >= 35
-      ? 'Good effort!'
-      : 'Keep learning!';
+    finalScore >= 90 ? 'Brilliant!'
+    : finalScore >= 75 ? 'Impressive!'
+    : finalScore >= 55 ? 'Well played!'
+    : finalScore >= 35 ? 'Good effort!'
+    : 'Keep learning!';
+
+  const handleShare = () => {
+    const url = typeof window !== 'undefined' ? window.location.origin : '';
+    const text = `I scored ${finalScore}/100 on Historical Proximity! Can you beat me? 🏛️\n${url}`;
+    if (navigator.share) {
+      navigator.share({ title: 'Historical Proximity', text, url });
+    } else {
+      navigator.clipboard?.writeText(text);
+    }
+  };
 
   return (
     <motion.div
@@ -74,7 +82,7 @@ export function ResultsScreen() {
       transition={{ duration: 0.5 }}
       className="w-full"
     >
-      {/* Header — "Final Results" in normal title case, not all-caps */}
+      {/* Header */}
       <div className="text-center mb-8">
         <p
           className="text-xs uppercase tracking-widest mb-2"
@@ -104,7 +112,7 @@ export function ResultsScreen() {
       {/* Stats row */}
       <div className="grid grid-cols-3 gap-3 mb-8">
         <motion.div
-          className="flex flex-col items-center rounded-2xl p-4"
+          className="flex flex-col items-center rounded-2xl p-5"
           style={{ background: 'var(--muted)' }}
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -117,13 +125,13 @@ export function ResultsScreen() {
           >
             {percentile !== null ? `Top ${100 - percentile}%` : '—'}
           </span>
-          <span className="text-xs mt-1" style={{ color: 'var(--muted-foreground)' }}>
+          <span className="text-xs mt-1 text-center" style={{ color: 'var(--muted-foreground)' }}>
             Percentile
           </span>
         </motion.div>
 
         <motion.div
-          className="flex flex-col items-center rounded-2xl p-4"
+          className="flex flex-col items-center rounded-2xl p-5"
           style={{ background: 'var(--muted)' }}
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -136,13 +144,13 @@ export function ResultsScreen() {
           >
             {streak !== null ? streak : '—'}
           </span>
-          <span className="text-xs mt-1" style={{ color: 'var(--muted-foreground)' }}>
+          <span className="text-xs mt-1 text-center" style={{ color: 'var(--muted-foreground)' }}>
             Day Streak
           </span>
         </motion.div>
 
         <motion.div
-          className="flex flex-col items-center rounded-2xl p-4"
+          className="flex flex-col items-center rounded-2xl p-5"
           style={{ background: 'var(--muted)' }}
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -155,20 +163,20 @@ export function ResultsScreen() {
           >
             {finalScore}
           </span>
-          <span className="text-xs mt-1" style={{ color: 'var(--muted-foreground)' }}>
+          <span className="text-xs mt-1 text-center" style={{ color: 'var(--muted-foreground)' }}>
             Avg Score
           </span>
         </motion.div>
       </div>
 
-      {/* Per-question breakdown — more padding on each row */}
+      {/* Per-question breakdown — increased padding */}
       <div className="rounded-2xl overflow-hidden mb-8" style={{ border: '1px solid var(--border)' }}>
         {game.questions.map((q, i) => {
           const answer = state.answers[i];
           return (
             <motion.div
               key={q.id}
-              className="flex items-center justify-between px-6 py-5"
+              className="flex items-center justify-between px-8 py-6"
               style={{
                 borderBottom: i < game.questions.length - 1 ? '1px solid var(--border)' : 'none',
                 background: 'var(--card)',
@@ -178,13 +186,10 @@ export function ResultsScreen() {
               transition={{ delay: 0.4 + i * 0.1 }}
             >
               <div className="flex-1 min-w-0 pr-6">
-                <p
-                  className="text-sm font-medium"
-                  style={{ color: 'var(--foreground)' }}
-                >
+                <p className="text-sm font-medium" style={{ color: 'var(--foreground)' }}>
                   {q.text}
                 </p>
-                <p className="text-xs mt-1" style={{ color: 'var(--muted-foreground)' }}>
+                <p className="text-xs mt-1.5" style={{ color: 'var(--muted-foreground)' }}>
                   {answer
                     ? `You: ${yearToDisplay(answer.estimatedYear)} · Correct: ${yearToDisplay(q.answerYear)}`
                     : 'Not answered'}
@@ -196,11 +201,9 @@ export function ResultsScreen() {
                   style={{
                     fontFamily: 'Georgia, serif',
                     color:
-                      (answer?.score ?? 0) >= 80
-                        ? '#16a34a'
-                        : (answer?.score ?? 0) >= 50
-                        ? '#ca8a04'
-                        : '#dc2626',
+                      (answer?.score ?? 0) >= 80 ? '#16a34a'
+                      : (answer?.score ?? 0) >= 50 ? '#ca8a04'
+                      : '#dc2626',
                   }}
                 >
                   {answer?.score ?? 0}
@@ -214,6 +217,16 @@ export function ResultsScreen() {
         })}
       </div>
 
+      {/* Countdown timer */}
+      <motion.div
+        className="mb-8"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.7 }}
+      >
+        <CountdownTimer />
+      </motion.div>
+
       {/* Share */}
       <motion.div
         className="text-center"
@@ -221,21 +234,11 @@ export function ResultsScreen() {
         animate={{ opacity: 1 }}
         transition={{ delay: 0.8 }}
       >
-        <p className="text-sm mb-5" style={{ color: 'var(--muted-foreground)' }}>
-          A new puzzle unlocks every day at midnight Eastern Time.
-        </p>
         <Button
           variant="outline"
           size="lg"
           style={{ paddingLeft: '3.5rem', paddingRight: '3.5rem' }}
-          onClick={() => {
-            const text = `I scored ${finalScore}/100 on Historical Proximity! Can you beat me? 🏛️`;
-            if (navigator.share) {
-              navigator.share({ title: 'Historical Proximity', text });
-            } else {
-              navigator.clipboard?.writeText(text);
-            }
-          }}
+          onClick={handleShare}
         >
           Share Result
         </Button>
